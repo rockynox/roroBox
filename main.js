@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 import five from 'johnny-five';
 import moment from 'moment';
-import {heart, initDayState, printSelectedMessage} from './utils';
+import {heart, printSelectedMessage, smile} from './utils';
 
 var board = new five.Board({repl: false});
-var ROUTINE_INTERVAL = 10000;
+var ROUTINE_INTERVAL = 5000;
 var monthCode = {
     8: 'aaa',
     9: 'atg',
@@ -14,8 +14,18 @@ var monthCode = {
     1: 'gta',
 };
 
-var state = initDayState();
+var state = {
+    messageTime: null,
+    typedCode: '',
+    now: moment(),
+    lightWasOn: false,
+    isTopOpen: false,
+};
+
 var clearTypedCodeTimeOut = null;
+
+var shouldDisplayMessage = false;
+var messageHasBeenDisplayed = false;
 
 board.on('ready', function () {
 
@@ -25,7 +35,8 @@ board.on('ready', function () {
     var ledBouton = new five.Led(3);
 
 //Traps
-    var trapOne = new five.Pin(2);
+    //Todo: remove commented declaration
+//     var trapOne = new five.Pin(2);
     var trapTwo = new five.Pin(12);
     var trapTop = new five.Pin(13);
 
@@ -42,7 +53,7 @@ board.on('ready', function () {
 
 //
     LCD.printMessage = (message) => {
-        console.log('PRINTING : ' + message);
+        console.log(state.now.format('D/M/YY [à] H:m:s') + ' Printing. ( "' + message + '" )');
         LCD.on();
         let numberOfScreen = Math.floor(message.length / 32) + 1;
         let duration = numberOfScreen * 3000;
@@ -66,19 +77,6 @@ board.on('ready', function () {
 
     emergencySwitch.on('down', function () {
         openTrapeTwo();
-    });
-
-//RedButton
-    var redButton = new five.Button(5);
-    redButton.on('press', function () {
-        console.log('mailPressed');
-        if (state.now.format('DD-MM-YYYY') === moment('10-11-2017', 'DD-MM-YYYY').format('DD-MM-YYYY')) {
-            doSunAction();
-        }
-        if (state.shouldDiplayMessage) {
-            printSelectedMessage(LCD.printMessage);
-            ledBouton.fadeOut(1000);
-        }
     });
 
 //KeyPad
@@ -121,18 +119,18 @@ board.on('ready', function () {
 ////////////////// Functions ////////////////
 
     var addTypedLetter = (letter) => {
-        console.log('letter : ' + letter + ' pressed');
+        console.log(state.now.format('D/M/YY [à] H:m:s') + ' : Letter : ' + letter + ' pressed');
         clearTimeout(clearTypedCodeTimeOut);
         state.typedCode = state.typedCode + letter;
-        console.log('typed code : ' + state.typedCode);
+        console.log(state.now.format('D/M/YY [à] H:m:s') + ' : Typed code : ' + state.typedCode);
         clearTypedCodeTimeOut = setTimeout(() => state.typedCode = '', 3000);
         checkTypedCode();
     };
 
     var checkTypedCode = () => {
-        if (monthCode[state.now.format('M')] === state.typedCode) {
+        if (monthCode[moment().format('M')] === state.typedCode) {
             console.log('Correct Code pour le mois de :');
-            switch (Number(state.now.format('M'))) {
+            switch (Number(moment().format('M'))) {
                 case 9:
                     console.log('septembre');
                     openTrapeOne();
@@ -158,7 +156,7 @@ board.on('ready', function () {
     };
 
     var giveCard = (cardNumber) => {
-        console.log('Giving Card... N° ' + cardNumber);
+        console.log(state.now.format('D/M/YY [à] H:m:s') + ' : Giving Card... N° ' + cardNumber);
         LCD.on();
         LCD.clear();
         LCD.cursor(0, 0);
@@ -183,6 +181,16 @@ board.on('ready', function () {
         setTimeout(() => matrix.clear(), timeout);
     };
 
+    var printHeartOnMatrix = () => {
+        matrix.draw(heart);
+        setTimeout(() => matrix.clear(), 5000);
+    };
+
+    var printSmileOnMatrix = () => {
+        matrix.draw(smile);
+        setTimeout(() => matrix.clear(), 5000);
+    };
+
     var closeTrapeTop = () => {
         console.log('closeTop');
         trapTop.high();
@@ -202,8 +210,9 @@ board.on('ready', function () {
     var openTrapeOne = () => {
         console.log('openOne');
         printCharOnMatrix('arrownw');
-        trapOne.high();
-        setTimeout(() => trapOne.low(), 10000);
+        //Todo: remove commented declaration
+        // trapOne.high();
+        // setTimeout(() => trapOne.low(), 10000);
         setTimeout(() => matrix.draw(heart), 10000);
         setTimeout(() => matrix.clear(), 20000);
     };
@@ -217,19 +226,79 @@ board.on('ready', function () {
         setTimeout(() => matrix.clear(), 20000);
     };
 
+//////////////// Debug Tests ////////////////
+
+//ledBouton
+    var greenLed = new five.Led(2);
+
+    var blinkGreenLed = () => {
+        greenLed.on();
+
+        this.wait(2000, function () {
+            greenLed.off();
+        });
+    };
+
+    //RedButton
+    var redButton = new five.Button(5);
+    redButton.on('press', function () {
+        console.log(state.now.format('D/M/YY [à] H:m:s') + ' : Mail pressed.');
+        if (moment().format('DD-MM-YYYY') === moment('10-11-2017', 'DD-MM-YYYY').format('DD-MM-YYYY')) {
+            doSunAction();
+        }
+        if (shouldDisplayMessage) {
+            ledBouton.fadeOut(1000);
+            printSelectedMessage(LCD.printMessage);
+            blinkGreenLed();
+            //printHeartOnMatrix();
+            messageHasBeenDisplayed = true;
+        }
+    });
+
 ////////////////// Routine ////////////////
 
-    setInterval(
-        function () {
-            let now = moment();
-            if (!now.isSame(state.messageTime, 'day')) {
-                state = initDayState();
-            }
-            if (state.messageTime.hours() === now.hours() && state.messageTime.minutes() === now.minutes()) {
-                state.shouldDiplayMessage = true;
-                ledBouton.on();
-            }
-        }, ROUTINE_INTERVAL);
+    // setInterval(
+    //     function () {
+    //         state.messageTime = moment();
+    //         state.messageTime.set({'hour': 8, 'minute': 26});
+    //
+    //         state.now = moment();
+    //
+    //         if (state.now.isAfter(state.messageTime, 'minute') && messageHasBeenDisplayed === false) {
+    //             console.log(state.now.format('D/M/YY [à] H:m:s') + ' : Message should be displayed.');
+    //             ledBouton.on();
+    //             shouldDisplayMessage = true;
+    //         } else if (state.now.isBefore(state.messageTime) && messageHasBeenDisplayed === true) {
+    //             console.log(state.now.format('D/M/YY [à] H:m:s') + ' : Message should NOT be displayed.');
+    //             messageHasBeenDisplayed = false;
+    //             shouldDisplayMessage = false;
+    //         }
+    //     }, ROUTINE_INTERVAL,
+    // );
 
-    LCD.printMessage('Hey jolie jeune fille !');
+    this.loop(ROUTINE_INTERVAL, () => {
+
+        state.messageTime = moment();
+        state.messageTime.set({'hour': 8, 'minute': 26});
+
+        state.now = moment();
+
+        if (state.now.isAfter(state.messageTime, 'minute') && messageHasBeenDisplayed === false) {
+            console.log(state.now.format('D/M/YY [à] H:m:s') + ' : Message should be displayed.');
+            ledBouton.on();
+            shouldDisplayMessage = true;
+        } else if (state.now.isBefore(state.messageTime) && messageHasBeenDisplayed === true) {
+            console.log(state.now.format('D/M/YY [à] H:m:s') + ' : Message should NOT be displayed.');
+            messageHasBeenDisplayed = false;
+            shouldDisplayMessage = false;
+        }
+    });
+
+    // LCD.printMessage('Hey jolie jeune fille !');
+    // printSmileOnMatrix();
+
+    LCD.printMessage('Je t\'aime');
+    printHeartOnMatrix();
 });
+
+
