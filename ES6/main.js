@@ -294,7 +294,7 @@ board.on('ready', function () {
         }
     });
 
-    // LCD.printMessage('Hey jolie jeune fille !');
+    // LCD.printMessage('Hey jolie jeune fille !');ç
     // printSmileOnMatrix();
 
     LCD.printMessage('Je t\'aime');

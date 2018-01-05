@@ -53,13 +53,6 @@ board.on('ready', function () {
 //ledBouton
     var greenLed = new five.Led(2);
 
-    var blinkGreenLed = () => {
-        greenLed.on();
-
-        this.wait(2000, function () {
-            led.stop().off();
-        });
-    }
 
     //RedButton
     var redButton = new five.Button(5);
@@ -77,7 +70,7 @@ board.on('ready', function () {
         }
     });
 
-////////////////// Routine ////////////////
+    ////////////////// Routine ////////////////
 
     setInterval(
         function () {
@@ -102,8 +95,6 @@ board.on('ready', function () {
     //     state.messageTime.set({'hour': 12, 'minute': 30});
     //
     //     state.now = moment();
-    //
-    //     //printSelectedMessage(LCD.printMessage);
     //
     //     if (state.now.isAfter(state.messageTime, 'minute') && messageHasBeenDisplayed === false) {
     //         ledBouton.on();
